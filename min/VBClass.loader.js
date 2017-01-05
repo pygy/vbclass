@@ -1,0 +1,2 @@
+/*! (C) WebReflection - Mit Style License */
+(function(d){for(var e=d.getElementsByTagName("script"),b={value:1},c=e.length,a;c--;){if(/(?:^|\/)VBClass\.loader\.js$/.test(a=e[c].src)){c=0;a=a.slice(0,-9);try{if(!Object.defineProperty(b,"_",b)._)throw"";}catch(f){a+=b.__defineGetter__?"define.":"IE."}}d.write('<script type="text/javascript" src="'+a+'js"><\/script>')}})(document);

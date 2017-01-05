@@ -1,0 +1,261 @@
+<!doctype html>
+<html>
+    <head>
+        <script src="min/VBClass.loader.js"></script>
+        <script src="src/JSON.loader.js"></script>
+        <script src="http://www.3site.eu/wru/wru.js"></script>
+        <script>
+        // let's do stuff onload ...
+        this.onload = function () {
+            wru.random = false; // keep the duplicated class at the end
+            wru.node = document.getElementById("results");
+            wru.test([{
+                name: "no expando (it may require seal or freeze so we should be in emulation mode)",
+                test: function () {
+                    VBClass("NoExpando", {});
+                    var
+                        o = new NoExpando,
+                        hasOwnProperty = {}.hasOwnProperty
+                    ;
+                    try {
+                        o.test = null;
+                        wru.assert(hasOwnProperty.call(o, "test") === false);
+                    } catch(e) {
+                        wru.assert(true);
+                    }
+                }
+            },{
+                name: "definition: value",
+                test: function () {
+                    VBClass("ValueOnly", {
+                        test: {
+                            value: null
+                        }
+                    });
+                    var o = new ValueOnly, obj = {}, f = function () {};
+                    wru.assert("default value", o.test === null);
+                    o.test = 123;
+                    wru.assert("value can be a primitive", o.test === 123);
+                    o.test = obj;
+                    wru.assert("value can be an object", o.test === obj);
+                    o.test = f;
+                    wru.assert("value can be a function", o.test === f);
+                    f.customProperty = obj;
+                    wru.assert("function can contain sutom properties", o.test.customProperty === obj);
+                }
+            },{
+                name: "definition: get",
+                test: function () {
+                    VBClass("ValueGetter", {
+                        test_: {
+                            value: null
+                        },
+                        test: {
+                            get: function () {
+                                return this.test_;
+                            }
+                        }
+                    });
+                    var obj = new ValueGetter, tmp = {};
+                    wru.assert("default", obj.test === obj.test_ && obj.test_ === null);
+                    obj.test_ = tmp;
+                    wru.assert("object", obj.test === obj.test_ && obj.test_ === tmp);
+                    obj.test_ = 123;
+                    wru.assert("number", obj.test === obj.test_ && obj.test_ === 123);
+                    obj.test_ = null;
+                    wru.assert("null", obj.test === obj.test_ && obj.test_ === null);
+                    tmp = function () {
+                        return this;
+                    };
+                    obj.test_ = tmp;
+                    wru.assert("function", obj.test === obj.test_ && obj.test_ === tmp);
+                    wru.assert("function invoked", obj.test.call(obj) === obj);
+                }
+            },{
+                name: "definition: set",
+                test: function () {
+                    VBClass("ValueSetter", {
+                        test_: {
+                            value: null
+                        },
+                        test: {
+                            set: function (value) {
+                                this.test_ = value;
+                            }
+                        }
+                    });
+                    var obj = new ValueSetter, tmp = {};
+                    wru.assert("default", obj.test_ === null);
+                    obj.test = tmp;
+                    wru.assert("object", obj.test_ === tmp);
+                    obj.test = 123;
+                    wru.assert("number", obj.test_ === 123);
+                    obj.test = null;
+                    wru.assert("null", obj.test_ === null);
+                    tmp = function () {};
+                    obj.test = tmp;
+                    wru.assert("function", obj.test_ === tmp);
+                }
+            },{
+                name: "definition: method",
+                test: function () {
+                    var f, obj;
+                    VBClass("Method", {
+                        testSelf: {
+                            value: function (a, b, c) {
+                                wru.assert("arguments.length", arguments.length === 3);
+                                wru.assert("first argument", a === 1);
+                                wru.assert("second argument", b === obj);
+                                wru.assert("third argument", c === null);
+                                wru.assert("this reference", obj === this);
+                                return obj;
+                            }
+                        },
+                        test: {
+                            value: f = function () {
+                                wru.assert("arguments.length", arguments.length === 0);
+                                return 123;
+                            }
+                        }
+                    });
+                    obj = new Method;
+                    wru.assert("returned value", obj.test() === 123);
+                    wru.assert("returned value", obj.testSelf(1, obj, null) === obj);
+                    try {
+                        obj.test = function () {};
+                        wru.assert("Silent assignment fails", obj.test === f);
+                    } catch(e) {
+                        wru.assert("Cannot assign to variable", true);
+                    }
+                }
+            },{
+                name: "definition: constructor",
+                test: function () {
+                    var obj = {}, instance, internal;
+                    VBClass("ConstructorCall", {
+                        constructor: {
+                            value: function (a, b, c) {
+                                wru.assert(arguments.length === 3);
+                                wru.assert(a === 1);
+                                wru.assert(b === obj);
+                                wru.assert(c === null);
+                                internal = this;
+                            }
+                        }
+                    });
+                    instance = new ConstructorCall(1, obj, null);
+                    wru.assert(instance === internal);
+                }
+            },{
+                name: "all together",
+                test: function () {
+                    var calls = 0, obj = {}, self;
+                    VBClass("AllTogether", {
+                        constructor: {
+                            value: function (arg) {
+                                ++calls;
+                                self = this;
+                                this.method(arg);
+                            }
+                        },
+                        method: {
+                            value: function (arg) {
+                                ++calls;
+                                this.getSet = arg;
+                            }
+                        },
+                        getSet: {
+                            get: function () {
+                                ++calls;
+                                return this.getSet_;
+                            },
+                            set: function (value) {
+                                ++calls;
+                                this.getSet_ = value;
+                            }
+                        },
+                        getSet_: {
+                            value: null
+                        }
+                    });
+                    wru.assert("object circus", (new AllTogether(obj)).getSet === obj);
+                    wru.assert("calls object", calls === 4);
+                    wru.assert("object primitive", (new AllTogether(456)).getSet === 456);
+                    wru.assert("calls primitive", calls === 8);
+                }
+            },{
+                name: "toString compromise",
+                test: function () {
+                    function toString(object) {
+                        return object.toString();
+                    }
+                    wru.assert("[object Object]" === toString(VBClass("Stringable", {
+                        toString: {
+                            value: function () {
+                                return "[object Object]";
+                            }
+                        }
+                    })()));
+                }
+            },{
+                name: "serializable",
+                test: function () {
+                    wru.assert('{"ok":true}' === JSON.stringify(VBClass("Serializable", {
+                        toJSON: {
+                            value: function (key) {
+                                return {ok:true};
+                            }
+                        }
+                    })()));
+                }
+            },{
+                name: "no duplicated classes",
+                test: function () {
+                    var Class = VBClass("NoDuplicates", {});
+                    try {
+                        VBClass("NoDuplicates", {});
+                        wru.assert(NoDuplicates === Class);
+                    } catch(e) {
+                        wru.assert(true);
+                    }
+                }
+            }], true);
+        };
+        </script>
+        <style type="text/css">
+        /* a bit of style is never that bad */
+
+        /* container, it can be the body */
+        a, #results {
+            font-family: sans-serif;
+            font-size: 9pt;
+        }
+
+        /* results, they are all divs */
+        #results div {
+            padding: 4px;
+        }
+
+        /* an error inside a method, just in case */
+        #results .error {
+            background: black;
+            color: white;
+        }
+
+        /* a wru.assert(false) */
+        #results .fail {
+            background: red;
+            color: white;
+        }
+
+        /* a wru.assert(true) */
+        #results .pass {
+            background: green;
+            color: black;
+        }
+        </style>
+    </head>
+    <body>
+        <div id="results"></div>
+    </body>
+</html>
